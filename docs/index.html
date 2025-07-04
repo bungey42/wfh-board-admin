@@ -6,7 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WFH Admin Setup</title>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
   <style>
     body { font-family: sans-serif; padding: 2rem; max-width: 600px; margin: auto; }
@@ -19,15 +18,8 @@
 </head>
 <body>
   <h1>Admin Setup – WFH Board</h1>
-  <!-- Auth removed -->
-<div id="authSection" class="hidden">
-    <p>Please log in with your admin email:</p>
-    <input type="email" id="email" placeholder="Email" />
-    <button onclick="sendLoginLink()">Send Magic Link</button>
-    <p id="status"></p>
-  </div>
 
-  <div id="adminPanel" class="hidden">
+  <div id="adminPanel">
     <label><input type="checkbox" id="bankHoliday" /> Bank holiday this week</label>
     <label><input type="checkbox" id="mon" /> Mandatory in-office Monday</label>
     <label><input type="checkbox" id="tue" /> Mandatory in-office Tuesday</label>
@@ -50,51 +42,7 @@
     };
 
     firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
     const db = firebase.firestore();
-
-    const adminEmails = [
-      "joe.bungey@mustardjobs.co.uk",
-      "daniela.kent@mustardjobs.co.uk"
-    ];
-
-    window.onload = function () {
-      // Skipping auth, always show admin panel
-      document.getElementById("adminPanel").classList.remove("hidden");
-      return;
-        if (user && adminEmails.includes(user.email)) {
-          document.getElementById("authSection").classList.add("hidden");
-          document.getElementById("adminPanel").classList.remove("hidden");
-        }
-      });
-
-      // Skipping email link login {
-        let email = window.localStorage.getItem("emailForSignIn");
-        if (!email) {
-          email = window.prompt("Please provide your email for confirmation");
-        }
-        auth.signInWithEmailLink(email, window.location.href).then(() => {
-          window.localStorage.removeItem("emailForSignIn");
-        }).catch(console.error);
-      }
-    };
-
-    function sendLoginLink() {
-      const email = document.getElementById("email").value;
-      const actionCodeSettings = {
-        url: window.location.href,
-        handleCodeInApp: true,
-      };
-      // Auth disabled: auth.sendSignInLinkToEmail(email, actionCodeSettings)
-        .then(() => {
-          window.localStorage.setItem("emailForSignIn", email);
-          document.getElementById("status").textContent = "Login link sent to " + email;
-        })
-        .catch(err => {
-          console.error(err);
-          document.getElementById("status").textContent = "Failed to send email.";
-        });
-    }
 
     async function releaseBoard() {
       const bankHoliday = document.getElementById("bankHoliday").checked;
