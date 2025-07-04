@@ -19,7 +19,8 @@
 </head>
 <body>
   <h1>Admin Setup – WFH Board</h1>
-  <div id="authSection">
+  <!-- Auth removed -->
+<div id="authSection" class="hidden">
     <p>Please log in with your admin email:</p>
     <input type="email" id="email" placeholder="Email" />
     <button onclick="sendLoginLink()">Send Magic Link</button>
@@ -58,14 +59,16 @@
     ];
 
     window.onload = function () {
-      auth.onAuthStateChanged(user => {
+      // Skipping auth, always show admin panel
+      document.getElementById("adminPanel").classList.remove("hidden");
+      return;
         if (user && adminEmails.includes(user.email)) {
           document.getElementById("authSection").classList.add("hidden");
           document.getElementById("adminPanel").classList.remove("hidden");
         }
       });
 
-      if (firebase.auth().isSignInWithEmailLink(window.location.href)) {
+      // Skipping email link login {
         let email = window.localStorage.getItem("emailForSignIn");
         if (!email) {
           email = window.prompt("Please provide your email for confirmation");
@@ -82,7 +85,7 @@
         url: window.location.href,
         handleCodeInApp: true,
       };
-      auth.sendSignInLinkToEmail(email, actionCodeSettings)
+      // Auth disabled: auth.sendSignInLinkToEmail(email, actionCodeSettings)
         .then(() => {
           window.localStorage.setItem("emailForSignIn", email);
           document.getElementById("status").textContent = "Login link sent to " + email;
