@@ -4,13 +4,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Admin WFH Kanban Board</title>
+  <title>Admin WFH Kanban (Multi-Week)</title>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
   <style>
     body { font-family: sans-serif; padding: 2rem; }
+    .header { display: flex; justify-content: space-between; align-items: center; }
     h1 { margin-bottom: 1rem; }
-    .tabs { display: flex; gap: 1rem; margin-bottom: 1rem; }
+    select { padding: 0.5rem; margin-left: 1rem; }
+    .tabs { display: flex; gap: 1rem; margin: 1rem 0; }
     .tab-button {
       padding: 0.5rem 1rem;
       background: #eee;
@@ -64,7 +66,14 @@
   </style>
 </head>
 <body>
-  <h1>Admin WFH Board – Next Week</h1>
+  <div class="header">
+    <h1>Admin WFH Board</h1>
+    <div>
+      <label for="weekSelector">Week:</label>
+      <select id="weekSelector"></select>
+    </div>
+  </div>
+
   <div class="admin-controls">
     <label><input type="checkbox" id="bankHoliday" /> Bank Holiday This Week</label>
     <div id="mandatoryControls"></div>
@@ -92,16 +101,51 @@
     const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
     const columns = ["In Office", "Working from Home", "On Annual Leave"];
     let state = {};
-    let mandatoryOfficeDays = [];
+    let currentWeekKey = "";
+    let allWeeks = [];
 
-    function initializeState() {
+    async function listWeeks() {
+      const snapshot = await db.collection("boards").get();
+      allWeeks = snapshot.docs.map(doc => doc.id).sort();
+      const selector = document.getElementById("weekSelector");
+      selector.innerHTML = "";
+      allWeeks.forEach(wk => {
+        const opt = document.createElement("option");
+        opt.value = wk;
+        opt.textContent = wk;
+        selector.appendChild(opt);
+      });
+      if (allWeeks.length) {
+        currentWeekKey = allWeeks[allWeeks.length - 1];
+        selector.value = currentWeekKey;
+        loadWeek(currentWeekKey);
+      }
+    }
+
+    async function loadWeek(weekKey) {
+      currentWeekKey = weekKey;
+      const doc = await db.collection("boards").doc(weekKey).get();
+      const data = doc.exists ? doc.data() : {};
+      state = data.state || initEmptyState();
+      document.getElementById("bankHoliday").checked = !!data.bankHoliday;
+      const mandatory = data.mandatoryOfficeDays || [];
+
+      days.forEach((_, idx) => {
+        document.getElementById("mand-" + idx).checked = mandatory.includes(idx);
+      });
+      render();
+    }
+
+    function initEmptyState() {
+      const newState = {};
       days.forEach((_, dayIdx) => {
-        state[dayIdx] = {
+        newState[dayIdx] = {
           "In Office": employees.map(e => e.Name),
           "Working from Home": [],
           "On Annual Leave": []
         };
       });
+      return newState;
     }
 
     function createCard(person) {
@@ -116,8 +160,16 @@
       return card;
     }
 
+    function moveCard(day, column, name) {
+      columns.forEach(col => {
+        state[day][col] = (state[day][col] || []).filter(p => p !== name);
+      });
+      state[day][column].push(name);
+      render();
+    }
+
     function render() {
-      days.forEach((_, dayIdx) => {
+      days.forEach((day, dayIdx) => {
         const container = document.getElementById("day-" + dayIdx);
         if (!container) return;
         container.innerHTML = "";
@@ -152,14 +204,6 @@
       });
     }
 
-    function moveCard(day, column, name) {
-      columns.forEach(col => {
-        state[day][col] = (state[day][col] || []).filter(p => p !== name);
-      });
-      state[day][column].push(name);
-      render();
-    }
-
     function setupTabs() {
       const tabBar = document.getElementById("tabs");
       const container = document.getElementById("dayContainers");
@@ -186,42 +230,30 @@
         mandControl.appendChild(chk);
       });
       tabBar.firstChild.click();
+
+      document.getElementById("weekSelector").addEventListener("change", (e) => {
+        loadWeek(e.target.value);
+      });
     }
 
     async function releaseBoard() {
       const bankHoliday = document.getElementById("bankHoliday").checked;
-      mandatoryOfficeDays = [];
+      const mandatoryOfficeDays = [];
       days.forEach((_, idx) => {
         if (document.getElementById(`mand-${idx}`).checked) mandatoryOfficeDays.push(idx);
       });
-      const today = new Date();
-      today.setDate(today.getDate() + (8 - today.getDay()));
-      const year = today.getFullYear();
-      const week = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const weekKey = year + "-W" + String(getWeekNumber(week)).padStart(2, "0");
-
-      await db.collection("boards").doc(weekKey).set({
+      await db.collection("boards").doc(currentWeekKey).set({
         released: true,
         bankHoliday,
         mandatoryOfficeDays,
         state,
         createdAt: new Date().toISOString()
       });
-
-      document.getElementById("status").textContent = "✅ Released for week " + weekKey;
+      document.getElementById("status").textContent = "✅ Released for " + currentWeekKey;
     }
 
-    function getWeekNumber(d) {
-      d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-      const dayNum = d.getUTCDay() || 7;
-      d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-      return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-    }
-
-    initializeState();
     setupTabs();
-    render();
+    listWeeks();
   </script>
 </body>
 </html>
