@@ -1,0 +1,128 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WFH Admin Setup</title>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; max-width: 600px; margin: auto; }
+    h1 { margin-bottom: 1rem; }
+    label { display: block; margin-top: 1rem; }
+    input[type='checkbox'] { margin-right: 0.5rem; }
+    button { margin-top: 2rem; padding: 0.75rem 1.5rem; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <h1>Admin Setup – WFH Board</h1>
+  <div id="authSection">
+    <p>Please log in with your admin email:</p>
+    <input type="email" id="email" placeholder="Email" />
+    <button onclick="sendLoginLink()">Send Magic Link</button>
+    <p id="status"></p>
+  </div>
+
+  <div id="adminPanel" class="hidden">
+    <label><input type="checkbox" id="bankHoliday" /> Bank holiday this week</label>
+    <label><input type="checkbox" id="mon" /> Mandatory in-office Monday</label>
+    <label><input type="checkbox" id="tue" /> Mandatory in-office Tuesday</label>
+    <label><input type="checkbox" id="wed" /> Mandatory in-office Wednesday</label>
+    <label><input type="checkbox" id="thu" /> Mandatory in-office Thursday</label>
+    <label><input type="checkbox" id="fri" /> Mandatory in-office Friday</label>
+
+    <button onclick="releaseBoard()">Release to Team</button>
+    <p id="saveStatus"></p>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCxHyL3-ecLuVjGrM2HjEbfAV7Kgh-Ufs8",
+      authDomain: "wfh-board.firebaseapp.com",
+      projectId: "wfh-board",
+      storageBucket: "wfh-board.appspot.com",
+      messagingSenderId: "204510362340",
+      appId: "1:204510362340:web:77f93cb517cbbee2f70af1"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    const adminEmails = [
+      "joe.bungey@mustardjobs.co.uk",
+      "daniela.kent@mustardjobs.co.uk"
+    ];
+
+    window.onload = function () {
+      auth.onAuthStateChanged(user => {
+        if (user && adminEmails.includes(user.email)) {
+          document.getElementById("authSection").classList.add("hidden");
+          document.getElementById("adminPanel").classList.remove("hidden");
+        }
+      });
+
+      if (firebase.auth().isSignInWithEmailLink(window.location.href)) {
+        let email = window.localStorage.getItem("emailForSignIn");
+        if (!email) {
+          email = window.prompt("Please provide your email for confirmation");
+        }
+        auth.signInWithEmailLink(email, window.location.href).then(() => {
+          window.localStorage.removeItem("emailForSignIn");
+        }).catch(console.error);
+      }
+    };
+
+    function sendLoginLink() {
+      const email = document.getElementById("email").value;
+      const actionCodeSettings = {
+        url: window.location.href,
+        handleCodeInApp: true,
+      };
+      auth.sendSignInLinkToEmail(email, actionCodeSettings)
+        .then(() => {
+          window.localStorage.setItem("emailForSignIn", email);
+          document.getElementById("status").textContent = "Login link sent to " + email;
+        })
+        .catch(err => {
+          console.error(err);
+          document.getElementById("status").textContent = "Failed to send email.";
+        });
+    }
+
+    async function releaseBoard() {
+      const bankHoliday = document.getElementById("bankHoliday").checked;
+      const mandatoryOfficeDays = [];
+      ["mon", "tue", "wed", "thu", "fri"].forEach((id, idx) => {
+        if (document.getElementById(id).checked) mandatoryOfficeDays.push(idx);
+      });
+
+      const today = new Date();
+      today.setDate(today.getDate() + (8 - today.getDay())); // next Monday
+      const year = today.getFullYear();
+      const week = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const weekKey = year + "-W" + String(getWeekNumber(week)).padStart(2, "0");
+
+      await db.collection("boards").doc(weekKey).set({
+        released: true,
+        bankHoliday,
+        mandatoryOfficeDays,
+        createdAt: new Date().toISOString()
+      });
+
+      document.getElementById("saveStatus").textContent = "Board released for week " + weekKey;
+    }
+
+    function getWeekNumber(d) {
+      d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+      const dayNum = d.getUTCDay() || 7;
+      d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    }
+  </script>
+</body>
+</html>
