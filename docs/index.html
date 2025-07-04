@@ -96,6 +96,35 @@
 
     firebase.initializeApp(firebaseConfig);
 
+async function ensureNextWeekExists() {
+  const today = new Date();
+  const nextMonday = new Date();
+  nextMonday.setDate(today.getDate() + (8 - today.getDay()));
+  const nextKey = getWeekKeyFromDate(nextMonday);
+  const nextDoc = await db.collection("boards").doc(nextKey).get();
+  if (!nextDoc.exists) {
+    const emptyState = {"0": {"In Office": ["Joe Bungey", "Jeni Jones", "Phil Boshier", "Daniela Kent", "Gregg Raven", "Oscar Dixon-Barrow", "Jack Perks", "Elaine Connell", "Martha Cumiskey", "Matt Owen", "Charlotte Berrow", "Hannah Lawry", "Molly McGuire", "Ben McKenna-Smith", "Ben Hackston", "Summer Bolitho"], "Working from Home": [], "On Annual Leave": []}, "1": {"In Office": ["Joe Bungey", "Jeni Jones", "Phil Boshier", "Daniela Kent", "Gregg Raven", "Oscar Dixon-Barrow", "Jack Perks", "Elaine Connell", "Martha Cumiskey", "Matt Owen", "Charlotte Berrow", "Hannah Lawry", "Molly McGuire", "Ben McKenna-Smith", "Ben Hackston", "Summer Bolitho"], "Working from Home": [], "On Annual Leave": []}, "2": {"In Office": ["Joe Bungey", "Jeni Jones", "Phil Boshier", "Daniela Kent", "Gregg Raven", "Oscar Dixon-Barrow", "Jack Perks", "Elaine Connell", "Martha Cumiskey", "Matt Owen", "Charlotte Berrow", "Hannah Lawry", "Molly McGuire", "Ben McKenna-Smith", "Ben Hackston", "Summer Bolitho"], "Working from Home": [], "On Annual Leave": []}, "3": {"In Office": ["Joe Bungey", "Jeni Jones", "Phil Boshier", "Daniela Kent", "Gregg Raven", "Oscar Dixon-Barrow", "Jack Perks", "Elaine Connell", "Martha Cumiskey", "Matt Owen", "Charlotte Berrow", "Hannah Lawry", "Molly McGuire", "Ben McKenna-Smith", "Ben Hackston", "Summer Bolitho"], "Working from Home": [], "On Annual Leave": []}, "4": {"In Office": ["Joe Bungey", "Jeni Jones", "Phil Boshier", "Daniela Kent", "Gregg Raven", "Oscar Dixon-Barrow", "Jack Perks", "Elaine Connell", "Martha Cumiskey", "Matt Owen", "Charlotte Berrow", "Hannah Lawry", "Molly McGuire", "Ben McKenna-Smith", "Ben Hackston", "Summer Bolitho"], "Working from Home": [], "On Annual Leave": []}};
+    await db.collection("boards").doc(nextKey).set({
+      released: false,
+      bankHoliday: false,
+      mandatoryOfficeDays: [],
+      state: emptyState,
+      createdAt: new Date().toISOString()
+    });
+    console.log("✅ Auto-created next week:", nextKey);
+  }
+}
+
+function getWeekKeyFromDate(dateObj) {
+  const d = new Date(Date.UTC(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNum = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return d.getUTCFullYear() + "-W" + String(weekNum).padStart(2, "0");
+}
+
+
 function weekKeyToLabel(weekKey) {
   const [year, w] = weekKey.split("-W");
   const weekNum = parseInt(w);
@@ -266,7 +295,7 @@ function weekKeyToLabel(weekKey) {
     }
 
     setupTabs();
-    listWeeks();
+    ensureNextWeekExists().then(listWeeks);
   </script>
 </body>
 </html>
