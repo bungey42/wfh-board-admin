@@ -2,34 +2,78 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WFH Admin Setup</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin WFH Kanban Board</title>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
   <style>
-    body { font-family: sans-serif; padding: 2rem; max-width: 600px; margin: auto; }
+    body { font-family: sans-serif; padding: 2rem; }
     h1 { margin-bottom: 1rem; }
-    label { display: block; margin-top: 1rem; }
-    input[type='checkbox'] { margin-right: 0.5rem; }
-    button { margin-top: 2rem; padding: 0.75rem 1.5rem; }
-    .hidden { display: none; }
+    .tabs { display: flex; gap: 1rem; margin-bottom: 1rem; }
+    .tab-button {
+      padding: 0.5rem 1rem;
+      background: #eee;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .tab-button.active {
+      background: #ddd;
+      font-weight: bold;
+    }
+    .admin-controls {
+      margin-bottom: 1rem;
+      padding: 1rem;
+      background: #f4f4f4;
+      border-radius: 8px;
+    }
+    .day-container { display: none; }
+    .day-container.active { display: block; }
+    .columns { display: flex; gap: 1rem; }
+    .column {
+      flex: 1;
+      padding: 1rem;
+      background: #f9f9f9;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      min-height: 300px;
+    }
+    .column h2 { margin-top: 0; }
+    .card {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem;
+      margin: 0.5rem 0;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      cursor: grab;
+    }
+    .card img {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+    button {
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+    }
   </style>
 </head>
 <body>
-  <h1>Admin Setup – WFH Board</h1>
-
-  <div id="adminPanel">
-    <label><input type="checkbox" id="bankHoliday" /> Bank holiday this week</label>
-    <label><input type="checkbox" id="mon" /> Mandatory in-office Monday</label>
-    <label><input type="checkbox" id="tue" /> Mandatory in-office Tuesday</label>
-    <label><input type="checkbox" id="wed" /> Mandatory in-office Wednesday</label>
-    <label><input type="checkbox" id="thu" /> Mandatory in-office Thursday</label>
-    <label><input type="checkbox" id="fri" /> Mandatory in-office Friday</label>
-
-    <button onclick="releaseBoard()">Release to Team</button>
-    <p id="saveStatus"></p>
+  <h1>Admin WFH Board – Next Week</h1>
+  <div class="admin-controls">
+    <label><input type="checkbox" id="bankHoliday" /> Bank Holiday This Week</label>
+    <div id="mandatoryControls"></div>
+    <button onclick="releaseBoard()">✅ Release to Team</button>
+    <p id="status"></p>
   </div>
+
+  <div class="tabs" id="tabs"></div>
+  <div id="dayContainers"></div>
 
   <script>
     const firebaseConfig = {
@@ -44,15 +88,114 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
+    const employees = [{"Name": "Joe Bungey", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2022/03/Joe-Bungey.png"}, {"Name": "Jeni Jones", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2025/07/Untitled-design-6.png"}, {"Name": "Phil Boshier", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2020/11/38.jpg"}, {"Name": "Daniela Kent", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2023/02/11.jpg"}, {"Name": "Gregg Raven", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2022/09/Gregg-Raven.png"}, {"Name": "Oscar Dixon-Barrow", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2022/03/Oscar-Dixon-Barrow.png"}, {"Name": "Jack Perks", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2023/08/Headshots-1.png"}, {"Name": "Elaine Connell", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2022/06/14.jpg"}, {"Name": "Martha Cumiskey", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2023/07/Headshots-3.png"}, {"Name": "Matt Owen", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2025/05/matt-e1747131126274.png"}, {"Name": "Charlotte Berrow", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2025/05/Untitled-design-3-e1747750363328.png"}, {"Name": "Hannah Lawry", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2020/11/Hannah-Lawry-low-re.png"}, {"Name": "Molly McGuire", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2023/10/Molly-McGuire.png"}, {"Name": "Ben McKenna-Smith", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2023/04/Ben-McKenna-Smith-1.png"}, {"Name": "Ben Hackston", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2022/01/Headshots-2.png"}, {"Name": "Summer Bolitho", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2025/05/summer-e1747140054919.png"}];
+    const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+    const columns = ["In Office", "Working from Home", "On Annual Leave"];
+    let state = {};
+    let mandatoryOfficeDays = [];
+
+    function initializeState() {
+      days.forEach((_, dayIdx) => {
+        state[dayIdx] = {
+          "In Office": employees.map(e => e.Name),
+          "Working from Home": [],
+          "On Annual Leave": []
+        };
+      });
+    }
+
+    function createCard(person) {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.draggable = true;
+      card.dataset.name = person.Name;
+      card.innerHTML = `<img src='${person["Photo URL"]}' alt='${person.Name}'><span>${person.Name}</span>`;
+      card.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text", person.Name);
+      });
+      return card;
+    }
+
+    function render() {
+      days.forEach((_, dayIdx) => {
+        const container = document.getElementById("day-" + dayIdx);
+        if (!container) return;
+        container.innerHTML = "";
+        const cols = document.createElement("div");
+        cols.className = "columns";
+
+        columns.forEach(col => {
+          const colDiv = document.createElement("div");
+          colDiv.className = "column";
+          colDiv.dataset.day = dayIdx;
+          colDiv.dataset.column = col;
+
+          colDiv.addEventListener("dragover", e => e.preventDefault());
+          colDiv.addEventListener("drop", e => {
+            const name = e.dataTransfer.getData("text");
+            moveCard(dayIdx, col, name);
+          });
+
+          const title = document.createElement("h2");
+          title.textContent = col;
+          colDiv.appendChild(title);
+
+          const people = (state[dayIdx]?.[col] || []);
+          people.forEach(name => {
+            const person = employees.find(p => p.Name === name);
+            if (person) colDiv.appendChild(createCard(person));
+          });
+
+          cols.appendChild(colDiv);
+        });
+        container.appendChild(cols);
+      });
+    }
+
+    function moveCard(day, column, name) {
+      columns.forEach(col => {
+        state[day][col] = (state[day][col] || []).filter(p => p !== name);
+      });
+      state[day][column].push(name);
+      render();
+    }
+
+    function setupTabs() {
+      const tabBar = document.getElementById("tabs");
+      const container = document.getElementById("dayContainers");
+      const mandControl = document.getElementById("mandatoryControls");
+      days.forEach((day, idx) => {
+        const btn = document.createElement("button");
+        btn.textContent = day;
+        btn.className = "tab-button";
+        btn.onclick = () => {
+          document.querySelectorAll(".tab-button").forEach(b => b.classList.remove("active"));
+          document.querySelectorAll(".day-container").forEach(c => c.classList.remove("active"));
+          btn.classList.add("active");
+          document.getElementById("day-" + idx).classList.add("active");
+        };
+        tabBar.appendChild(btn);
+
+        const dayDiv = document.createElement("div");
+        dayDiv.className = "day-container";
+        dayDiv.id = "day-" + idx;
+        container.appendChild(dayDiv);
+
+        const chk = document.createElement("label");
+        chk.innerHTML = `<input type="checkbox" id="mand-${idx}" /> Mandatory in-office on ${day}`;
+        mandControl.appendChild(chk);
+      });
+      tabBar.firstChild.click();
+    }
+
     async function releaseBoard() {
       const bankHoliday = document.getElementById("bankHoliday").checked;
-      const mandatoryOfficeDays = [];
-      ["mon", "tue", "wed", "thu", "fri"].forEach((id, idx) => {
-        if (document.getElementById(id).checked) mandatoryOfficeDays.push(idx);
+      mandatoryOfficeDays = [];
+      days.forEach((_, idx) => {
+        if (document.getElementById(`mand-${idx}`).checked) mandatoryOfficeDays.push(idx);
       });
-
       const today = new Date();
-      today.setDate(today.getDate() + (8 - today.getDay())); // next Monday
+      today.setDate(today.getDate() + (8 - today.getDay()));
       const year = today.getFullYear();
       const week = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const weekKey = year + "-W" + String(getWeekNumber(week)).padStart(2, "0");
@@ -61,10 +204,11 @@
         released: true,
         bankHoliday,
         mandatoryOfficeDays,
+        state,
         createdAt: new Date().toISOString()
       });
 
-      document.getElementById("saveStatus").textContent = "Board released for week " + weekKey;
+      document.getElementById("status").textContent = "✅ Released for week " + weekKey;
     }
 
     function getWeekNumber(d) {
@@ -74,6 +218,10 @@
       const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
       return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
     }
+
+    initializeState();
+    setupTabs();
+    render();
   </script>
 </body>
 </html>
