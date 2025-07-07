@@ -1,17 +1,13 @@
 
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Admin WFH Kanban (Multi-Week)</title>
+  <title>WFH Admin Board</title>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+  <script defer src="admin.js"></script>
   <style>
     body { font-family: sans-serif; padding: 2rem; }
-    .header { display: flex; justify-content: space-between; align-items: center; }
-    h1 { margin-bottom: 1rem; }
-    select { padding: 0.5rem; margin-left: 1rem; }
     .tabs { display: flex; gap: 1rem; margin: 1rem 0; }
     .tab-button {
       padding: 0.5rem 1rem;
@@ -23,12 +19,6 @@
     .tab-button.active {
       background: #ddd;
       font-weight: bold;
-    }
-    .admin-controls {
-      margin-bottom: 1rem;
-      padding: 1rem;
-      background: #f4f4f4;
-      border-radius: 8px;
     }
     .day-container { display: none; }
     .day-container.active { display: block; }
@@ -59,243 +49,50 @@
       border-radius: 50%;
       object-fit: cover;
     }
-    button {
-      margin-top: 1rem;
-      padding: 0.5rem 1rem;
+    .controls {
+      margin-bottom: 1rem;
+    }
+    .controls label {
+      margin-right: 1rem;
+    }
+    .legend {
+      background: #fff3cd;
+      border-left: 6px solid #ffecb5;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+      border-radius: 6px;
+    }
+    .legend h3 {
+      margin-top: 0;
+    }
+    .legend ul {
+      margin: 0;
+      padding-left: 1.2rem;
     }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>Admin WFH Board</h1>
-    <div>
-      <label for="weekSelector">Week:</label>
-      <select id="weekSelector"></select>
-    </div>
+  <h1>WFH Admin Board</h1>
+
+  <div class="legend">
+    <h3>📋 Admin Instructions:</h3>
+    <ul>
+      <li>🗓️ Select a week using the dropdown to configure WFH availability.</li>
+      <li>✔️ Toggle bank holidays or mandatory in-office days per week.</li>
+      <li>☀️ Move people to Annual Leave or 🤒 Sick Leave if needed.</li>
+      <li>📤 When ready, click <strong>Release to Team</strong> to allow bookings.</li>
+    </ul>
   </div>
 
-  <div class="admin-controls">
-    <label><input type="checkbox" id="bankHoliday" /> Bank Holiday This Week</label>
-    <div id="mandatoryControls"></div>
-    <button onclick="releaseBoard()">✅ Release to Team</button>
-    <p id="status"></p>
+  <div class="controls">
+    <label for="weekDropdown">Select Week:</label>
+    <select id="weekDropdown"></select>
+    <label><input type="checkbox" id="bankHoliday"> Bank Holiday Week</label>
+    <label><input type="checkbox" id="mandatoryInOffice"> Mandatory In-Office Day (mid-week)</label>
+    <button id="releaseBtn">Release to Team</button>
+    <span id="statusMessage" style="margin-left: 1rem; color: green;"></span>
   </div>
 
-  <div class="tabs" id="tabs"></div>
-  <div id="dayContainers"></div>
-
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyCxHyL3-ecLuVjGrM2HjEbfAV7Kgh-Ufs8",
-      authDomain: "wfh-board.firebaseapp.com",
-      projectId: "wfh-board",
-      storageBucket: "wfh-board.appspot.com",
-      messagingSenderId: "204510362340",
-      appId: "1:204510362340:web:77f93cb517cbbee2f70af1"
-    };
-
-    firebase.initializeApp(firebaseConfig);
-
-async function ensureNextWeekExists() {
-  const today = new Date();
-  const nextMonday = new Date();
-  nextMonday.setDate(today.getDate() + (8 - today.getDay()));
-  const nextKey = getWeekKeyFromDate(nextMonday);
-  const nextDoc = await db.collection("boards").doc(nextKey).get();
-  if (!nextDoc.exists) {
-    const emptyState = {"0": {"In Office": ["Joe Bungey", "Jeni Jones", "Phil Boshier", "Daniela Kent", "Gregg Raven", "Oscar Dixon-Barrow", "Jack Perks", "Elaine Connell", "Martha Cumiskey", "Matt Owen", "Charlotte Berrow", "Hannah Lawry", "Molly McGuire", "Ben McKenna-Smith", "Ben Hackston", "Summer Bolitho"], "Working from Home": [], "On Annual Leave": []}, "1": {"In Office": ["Joe Bungey", "Jeni Jones", "Phil Boshier", "Daniela Kent", "Gregg Raven", "Oscar Dixon-Barrow", "Jack Perks", "Elaine Connell", "Martha Cumiskey", "Matt Owen", "Charlotte Berrow", "Hannah Lawry", "Molly McGuire", "Ben McKenna-Smith", "Ben Hackston", "Summer Bolitho"], "Working from Home": [], "On Annual Leave": []}, "2": {"In Office": ["Joe Bungey", "Jeni Jones", "Phil Boshier", "Daniela Kent", "Gregg Raven", "Oscar Dixon-Barrow", "Jack Perks", "Elaine Connell", "Martha Cumiskey", "Matt Owen", "Charlotte Berrow", "Hannah Lawry", "Molly McGuire", "Ben McKenna-Smith", "Ben Hackston", "Summer Bolitho"], "Working from Home": [], "On Annual Leave": []}, "3": {"In Office": ["Joe Bungey", "Jeni Jones", "Phil Boshier", "Daniela Kent", "Gregg Raven", "Oscar Dixon-Barrow", "Jack Perks", "Elaine Connell", "Martha Cumiskey", "Matt Owen", "Charlotte Berrow", "Hannah Lawry", "Molly McGuire", "Ben McKenna-Smith", "Ben Hackston", "Summer Bolitho"], "Working from Home": [], "On Annual Leave": []}, "4": {"In Office": ["Joe Bungey", "Jeni Jones", "Phil Boshier", "Daniela Kent", "Gregg Raven", "Oscar Dixon-Barrow", "Jack Perks", "Elaine Connell", "Martha Cumiskey", "Matt Owen", "Charlotte Berrow", "Hannah Lawry", "Molly McGuire", "Ben McKenna-Smith", "Ben Hackston", "Summer Bolitho"], "Working from Home": [], "On Annual Leave": []}};
-    await db.collection("boards").doc(nextKey).set({
-      released: false,
-      bankHoliday: false,
-      mandatoryOfficeDays: [],
-      state: emptyState,
-      createdAt: new Date().toISOString()
-    });
-    console.log("✅ Auto-created next week:", nextKey);
-  }
-}
-
-function getWeekKeyFromDate(dateObj) {
-  const d = new Date(Date.UTC(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNum = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-  return d.getUTCFullYear() + "-W" + String(weekNum).padStart(2, "0");
-}
-
-
-function weekKeyToLabel(weekKey) {
-  const [year, w] = weekKey.split("-W");
-  const weekNum = parseInt(w);
-  const date = new Date(year, 0, 1 + (weekNum - 1) * 7);
-  const day = date.getDay();
-  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(date.setDate(diff));
-  const options = { day: "numeric", month: "long", year: "numeric" };
-  return "Week Commencing " + monday.toLocaleDateString("en-GB", options);
-}
-
-    const db = firebase.firestore();
-
-    const employees = [{"Name": "Joe Bungey", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2022/03/Joe-Bungey.png"}, {"Name": "Jeni Jones", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2025/07/Untitled-design-6.png"}, {"Name": "Phil Boshier", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2020/11/38.jpg"}, {"Name": "Daniela Kent", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2023/02/11.jpg"}, {"Name": "Gregg Raven", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2022/09/Gregg-Raven.png"}, {"Name": "Oscar Dixon-Barrow", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2022/03/Oscar-Dixon-Barrow.png"}, {"Name": "Jack Perks", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2023/08/Headshots-1.png"}, {"Name": "Elaine Connell", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2022/06/14.jpg"}, {"Name": "Martha Cumiskey", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2023/07/Headshots-3.png"}, {"Name": "Matt Owen", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2025/05/matt-e1747131126274.png"}, {"Name": "Charlotte Berrow", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2025/05/Untitled-design-3-e1747750363328.png"}, {"Name": "Hannah Lawry", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2020/11/Hannah-Lawry-low-re.png"}, {"Name": "Molly McGuire", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2023/10/Molly-McGuire.png"}, {"Name": "Ben McKenna-Smith", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2023/04/Ben-McKenna-Smith-1.png"}, {"Name": "Ben Hackston", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2022/01/Headshots-2.png"}, {"Name": "Summer Bolitho", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2025/05/summer-e1747140054919.png"}];
-    const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
-    const columns = ["In Office", "Working from Home", "On Annual Leave"];
-    let state = {};
-    let currentWeekKey = "";
-    let allWeeks = [];
-
-    async function listWeeks() {
-      const snapshot = await db.collection("boards").get();
-      allWeeks = snapshot.docs.map(doc => doc.id).sort();
-      const selector = document.getElementById("weekSelector");
-      selector.innerHTML = "";
-      allWeeks.forEach(wk => {
-        const label = weekKeyToLabel(wk);
-        const opt = document.createElement("option");
-        opt.value = wk;
-        opt.textContent = label;
-        selector.appendChild(opt);
-      });
-      if (allWeeks.length) {
-        currentWeekKey = allWeeks[allWeeks.length - 1];
-        selector.value = currentWeekKey;
-        loadWeek(currentWeekKey);
-      }
-    }
-
-    async function loadWeek(weekKey) {
-      currentWeekKey = weekKey;
-      const doc = await db.collection("boards").doc(weekKey).get();
-      const data = doc.exists ? doc.data() : {};
-      state = data.state || initEmptyState();
-      document.getElementById("bankHoliday").checked = !!data.bankHoliday;
-      const mandatory = data.mandatoryOfficeDays || [];
-
-      days.forEach((_, idx) => {
-        document.getElementById("mand-" + idx).checked = mandatory.includes(idx);
-      });
-      render();
-    }
-
-    function initEmptyState() {
-      const newState = {};
-      days.forEach((_, dayIdx) => {
-        newState[dayIdx] = {
-          "In Office": employees.map(e => e.Name),
-          "Working from Home": [],
-          "On Annual Leave": []
-        };
-      });
-      return newState;
-    }
-
-    function createCard(person) {
-      const card = document.createElement("div");
-      card.className = "card";
-      card.draggable = true;
-      card.dataset.name = person.Name;
-      card.innerHTML = `<img src='${person["Photo URL"]}' alt='${person.Name}'><span>${person.Name}</span>`;
-      card.addEventListener("dragstart", (e) => {
-        e.dataTransfer.setData("text", person.Name);
-      });
-      return card;
-    }
-
-    function moveCard(day, column, name) {
-      columns.forEach(col => {
-        state[day][col] = (state[day][col] || []).filter(p => p !== name);
-      });
-      state[day][column].push(name);
-      render();
-    }
-
-    function render() {
-      days.forEach((day, dayIdx) => {
-        const container = document.getElementById("day-" + dayIdx);
-        if (!container) return;
-        container.innerHTML = "";
-        const cols = document.createElement("div");
-        cols.className = "columns";
-
-        columns.forEach(col => {
-          const colDiv = document.createElement("div");
-          colDiv.className = "column";
-          colDiv.dataset.day = dayIdx;
-          colDiv.dataset.column = col;
-
-          colDiv.addEventListener("dragover", e => e.preventDefault());
-          colDiv.addEventListener("drop", e => {
-            const name = e.dataTransfer.getData("text");
-            moveCard(dayIdx, col, name);
-          });
-
-          const title = document.createElement("h2");
-          title.textContent = col;
-          colDiv.appendChild(title);
-
-          const people = (state[dayIdx]?.[col] || []);
-          people.forEach(name => {
-            const person = employees.find(p => p.Name === name);
-            if (person) colDiv.appendChild(createCard(person));
-          });
-
-          cols.appendChild(colDiv);
-        });
-        container.appendChild(cols);
-      });
-    }
-
-    function setupTabs() {
-      const tabBar = document.getElementById("tabs");
-      const container = document.getElementById("dayContainers");
-      const mandControl = document.getElementById("mandatoryControls");
-      days.forEach((day, idx) => {
-        const btn = document.createElement("button");
-        btn.textContent = day;
-        btn.className = "tab-button";
-        btn.onclick = () => {
-          document.querySelectorAll(".tab-button").forEach(b => b.classList.remove("active"));
-          document.querySelectorAll(".day-container").forEach(c => c.classList.remove("active"));
-          btn.classList.add("active");
-          document.getElementById("day-" + idx).classList.add("active");
-        };
-        tabBar.appendChild(btn);
-
-        const dayDiv = document.createElement("div");
-        dayDiv.className = "day-container";
-        dayDiv.id = "day-" + idx;
-        container.appendChild(dayDiv);
-
-        const chk = document.createElement("label");
-        chk.innerHTML = `<input type="checkbox" id="mand-${idx}" /> Mandatory in-office on ${day}`;
-        mandControl.appendChild(chk);
-      });
-      tabBar.firstChild.click();
-
-      document.getElementById("weekSelector").addEventListener("change", (e) => {
-        loadWeek(e.target.value);
-      });
-    }
-
-    async function releaseBoard() {
-      const bankHoliday = document.getElementById("bankHoliday").checked;
-      const mandatoryOfficeDays = [];
-      days.forEach((_, idx) => {
-        if (document.getElementById(`mand-${idx}`).checked) mandatoryOfficeDays.push(idx);
-      });
-      await db.collection("boards").doc(currentWeekKey).set({
-        released: true,
-        bankHoliday,
-        mandatoryOfficeDays,
-        state,
-        createdAt: new Date().toISOString()
-      });
-      document.getElementById("status").textContent = "✅ Released for " + currentWeekKey;
-    }
-
-    setupTabs();
-    ensureNextWeekExists().then(listWeeks);
-  </script>
+  <div id="adminBoardContainer"></div>
 </body>
 </html>
