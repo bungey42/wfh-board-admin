@@ -78,7 +78,7 @@
     <h3>📋 Admin Instructions:</h3>
     <ul>
       <li>🗓️ Select a week using the dropdown to configure WFH availability.</li>
-      <li>✔️ Toggle bank holidays or mandatory in-office days per week.</li>
+      <li>✔️ Toggle bank holidays or select one or more mandatory in-office days.</li>
       <li>☀️ Move people to Annual Leave or 🤒 Sick Leave if needed.</li>
       <li>📤 When ready, click <strong>Release to Team</strong> to allow bookings.</li>
     </ul>
@@ -88,7 +88,7 @@
     <label for="weekDropdown">Select Week:</label>
     <select id="weekDropdown"></select>
     <label><input type="checkbox" id="bankHoliday"> Bank Holiday Week</label>
-    <label><input type="checkbox" id="mandatoryInOffice"> Mandatory In-Office Day (mid-week)</label>
+    <span id="mandatoryDaysContainer"></span>
     <button id="releaseBtn">Release to Team</button>
     <span id="statusMessage" style="margin-left: 1rem; color: green;"></span>
   </div>
