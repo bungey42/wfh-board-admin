@@ -1,1 +1,1 @@
-// Admin board with Half Day AM/PM modal logic behind toggle
+// Final safe version with modal injected behind toggle, week dropdown tested
