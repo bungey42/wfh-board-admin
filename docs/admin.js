@@ -1,66 +1,36 @@
 
-// Safe modal-enabled script with robust error wrapping
+// Safe week dropdown formatting with labels like "Week commencing 21 July"
 document.addEventListener("DOMContentLoaded", function () {
-  try {
-    const toggleDiv = document.createElement("div");
-    toggleDiv.innerHTML = '<label><input type="checkbox" id="halfDayToggle" /> Enable Half Day Mode</label>';
-    document.body.prepend(toggleDiv);
+  const dropdown = document.getElementById("weekDropdown");
 
-    const toggle = document.getElementById("halfDayToggle");
-    toggle.addEventListener("change", function () {
-      console.log("✅ Half Day Mode Toggled:", toggle.checked);
+  function getMonday(iWeeksAhead = 0) {
+    const now = new Date();
+    const day = now.getDay();
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1) + (iWeeksAhead * 7);
+    return new Date(now.setDate(diff));
+  }
+
+  for (let i = 0; i < 4; i++) {
+    const monday = getMonday(i);
+    const keyDate = new Date(monday);
+    const weekKey = keyDate.toISOString().slice(0, 10); // for example '2025-07-21'
+
+    const iso = new Date(Date.UTC(keyDate.getFullYear(), keyDate.getMonth(), keyDate.getDate()));
+    const dayNum = iso.getUTCDay() || 7;
+    iso.setUTCDate(iso.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(iso.getUTCFullYear(), 0, 1));
+    const weekNum = Math.ceil((((iso - yearStart) / 86400000) + 1) / 7);
+    const weekKeyFormatted = iso.getUTCFullYear() + "-W" + String(weekNum).padStart(2, "0");
+
+    const label = "Week commencing " + monday.toLocaleDateString("en-GB", {
+      day: "numeric", month: "long", year: "numeric"
     });
 
-    // Simulate dropdown content
-    const weekDropdown = document.getElementById("weekDropdown");
-    if (weekDropdown) {
-      for (let i = 0; i < 3; i++) {
-        const opt = document.createElement("option");
-        opt.value = "2025-W3" + i;
-        opt.textContent = "Week commencing 2025-W3" + i;
-        weekDropdown.appendChild(opt);
-      }
-      weekDropdown.selectedIndex = 0;
-    }
-
-    // Add modal logic — safe wrapper
-    function createHalfDayModal(name, callback) {
-      try {
-        const modal = document.createElement("div");
-        modal.style.position = "fixed";
-        modal.style.top = "30%";
-        modal.style.left = "30%";
-        modal.style.padding = "20px";
-        modal.style.background = "white";
-        modal.style.border = "1px solid black";
-        modal.innerHTML = `
-          <p><strong>${name}</strong></p>
-          <label><input type="radio" name="half" value="AM" checked /> AM</label>
-          <label><input type="radio" name="half" value="PM" /> PM</label><br>
-          <label>Other half:</label>
-          <select id="otherColumn">
-            <option>In Office</option>
-            <option>Working from Home</option>
-            <option>On Annual Leave</option>
-            <option>Sick Leave</option>
-          </select><br><br>
-          <button id="confirmBtn">Confirm</button>
-        `;
-        document.body.appendChild(modal);
-        document.getElementById("confirmBtn").addEventListener("click", () => {
-          const half = modal.querySelector('input[name="half"]:checked').value;
-          const other = modal.querySelector("#otherColumn").value;
-          console.log("✅ Modal confirmed:", name, half, other);
-          modal.remove();
-          callback({ name, halfDay: true, half, other });
-        });
-      } catch (err) {
-        console.error("❌ Modal logic failed", err);
-      }
-    }
-
-    console.log("✅ Modal logic active");
-  } catch (error) {
-    console.error("❌ Script failed to run:", error);
+    const opt = document.createElement("option");
+    opt.value = weekKeyFormatted;
+    opt.textContent = label;
+    dropdown.appendChild(opt);
   }
+
+  dropdown.selectedIndex = 0;
 });
