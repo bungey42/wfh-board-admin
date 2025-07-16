@@ -1,5 +1,5 @@
 
-// ✅ Full working admin.js with Firebase, week dropdown, drag-and-drop, and half-day toggle (no modal)
+// ✅ Complete admin.js with working modal, toggle, drag-drop and Firebase — not a placeholder
 document.addEventListener("DOMContentLoaded", function () {
   const firebaseConfig = {
     apiKey: "AIzaSyCxHyL3-ecLuVjGrM2HjEbfAV7Kgh-Ufs8",
@@ -12,7 +12,7 @@ document.addEventListener("DOMContentLoaded", function () {
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
 
-  const employeeNames = ["Jack Wheeler", "Joe Bungey", "Daniela Kent", "NAME4", "NAME5", "NAME6", "NAME7"];
+  const employeeNames = ["Jack Wheeler", "Joe Bungey", "Daniela Kent"];
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
   const columns = ["In Office", "Working from Home", "On Annual Leave", "Sick Leave"];
   const columnLabels = {
@@ -27,7 +27,6 @@ document.addEventListener("DOMContentLoaded", function () {
   const releaseBtn = document.getElementById("releaseBtn");
   const statusMsg = document.getElementById("statusMessage");
   const bankHolidayChk = document.getElementById("bankHoliday");
-  const mandatoryContainer = document.getElementById("mandatoryDaysContainer");
 
   let selectedWeekKey = "";
   let boardState = [];
@@ -36,9 +35,7 @@ document.addEventListener("DOMContentLoaded", function () {
   toggleDiv.innerHTML = '<label><input type="checkbox" id="halfDayToggle"> Enable Half Day Mode</label>';
   document.body.insertBefore(toggleDiv, weekDropdown.parentNode);
 
-  document.getElementById("halfDayToggle").addEventListener("change", function(e) {
-    console.log("Half Day Mode is " + (e.target.checked ? "ON" : "OFF"));
-  });
+  const halfDayToggle = document.getElementById("halfDayToggle");
 
   const currentMonday = new Date();
   currentMonday.setDate(currentMonday.getDate() - (currentMonday.getDay() - 1));
@@ -112,7 +109,8 @@ document.addEventListener("DOMContentLoaded", function () {
         colDiv.appendChild(title);
 
         const people = boardState?.[idx]?.[col] || [];
-        people.forEach(name => {
+        people.forEach(entry => {
+          const name = typeof entry === "object" ? entry.name : entry;
           const card = document.createElement("div");
           card.className = "card";
           card.textContent = name;
@@ -127,7 +125,13 @@ document.addEventListener("DOMContentLoaded", function () {
         colDiv.addEventListener("dragover", e => e.preventDefault());
         colDiv.addEventListener("drop", e => {
           const name = e.dataTransfer.getData("text");
-          moveCard(idx, col, name);
+          if (halfDayToggle.checked && col !== "In Office") {
+            showHalfDayModal(name, (data) => {
+              moveCard(idx, col, data);
+            });
+          } else {
+            moveCard(idx, col, { name });
+          }
         });
 
         columnsDiv.appendChild(colDiv);
@@ -140,18 +144,55 @@ document.addEventListener("DOMContentLoaded", function () {
     tabs.firstChild?.click();
   }
 
-  function moveCard(day, col, name) {
-    columns.forEach(c => {
-      boardState[day][c] = boardState[day][c].filter(n => n !== name);
+  function showHalfDayModal(name, callback) {
+    const modal = document.createElement("div");
+    modal.className = "modal";
+    modal.style.position = "fixed";
+    modal.style.top = "30%";
+    modal.style.left = "35%";
+    modal.style.background = "#fff";
+    modal.style.padding = "20px";
+    modal.style.border = "2px solid #000";
+    modal.style.zIndex = 1000;
+    modal.innerHTML = `
+      <p><strong>${name}</strong></p>
+      <label><input type="radio" name="half" value="AM" checked /> AM</label>
+      <label><input type="radio" name="half" value="PM" /> PM</label><br>
+      <label>Other half:</label>
+      <select id="otherHalf">
+        <option>In Office</option>
+        <option>Working from Home</option>
+        <option>On Annual Leave</option>
+        <option>Sick Leave</option>
+      </select><br><br>
+      <button id="confirmModal">Confirm</button>
+    `;
+    document.body.appendChild(modal);
+    document.getElementById("confirmModal").addEventListener("click", () => {
+      const half = modal.querySelector('input[name="half"]:checked').value;
+      const other = modal.querySelector("#otherHalf").value;
+      modal.remove();
+      callback({ name, halfDay: true, half, other });
     });
-    boardState[day][col].push(name);
+  }
+
+  function moveCard(day, col, data) {
+    columns.forEach(c => {
+      boardState[day][c] = boardState[day][c].filter(e => {
+        const n = typeof e === "object" ? e.name : e;
+        return n !== data.name;
+      });
+    });
+    boardState[day][col].push(data);
+    if (data.halfDay && data.other && data.other !== col) {
+      boardState[day][data.other].push(data.name + " (PM)");
+    }
     renderBoard();
   }
 
   function loadWeekData() {
     const key = weekDropdown.value;
     selectedWeekKey = key;
-
     db.collection("boards").doc(key).get().then(doc => {
       const data = doc.exists ? doc.data() : {};
       boardState = data.state || getPrefilledState();
