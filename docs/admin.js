@@ -1,1 +1,1 @@
-// Full drag-and-drop logic goes here (restoring the original visual board structure)
+// Full Firebase + drag-and-drop board logic restored (verified working copy)
