@@ -11,6 +11,9 @@ document.addEventListener("DOMContentLoaded", function () {
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
 
+  const employees = [{"Name": "Phil Boshier", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2020/11/38.jpg"}, {"Name": "Oscar Dixon-Barrow", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2022/03/Oscar-Dixon-Barrow.png"}, {"Name": "Jack Perks", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2023/08/Headshots-1.png"}, {"Name": "Elaine Connell", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2022/06/14.jpg"}, {"Name": "Martha Cumiskey", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2023/07/Headshots-3.png"}, {"Name": "Matt Owen", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2025/05/matt-e1747131126274.png"}, {"Name": "Charlotte Berrow", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2025/05/Untitled-design-3-e1747750363328.png"}, {"Name": "Hannah Lawry", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2020/11/Hannah-Lawry-low-re.png"}, {"Name": "Molly McGuire", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2023/10/Molly-McGuire.png"}, {"Name": "Ben McKenna-Smith", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2023/04/Ben-McKenna-Smith-1.png"}, {"Name": "Ben Hackston", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2022/01/Headshots-2.png"}, {"Name": "Summer Bolitho", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2025/05/summer-e1747140054919.png"}, {"Name": "Jack Wheeler", "Photo URL": "https://www.mustardjobs.co.uk/wp-content/uploads/2020/11/Jack-Wheeler-2.png"}];
+  const employeeNames = ["Phil Boshier", "Oscar Dixon-Barrow", "Jack Perks", "Elaine Connell", "Martha Cumiskey", "Matt Owen", "Charlotte Berrow", "Hannah Lawry", "Molly McGuire", "Ben McKenna-Smith", "Ben Hackston", "Summer Bolitho", "Jack Wheeler"];
+
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
   const columns = ["In Office", "Working from Home", "On Annual Leave", "Sick Leave"];
   const columnLabels = {
@@ -19,10 +22,6 @@ document.addEventListener("DOMContentLoaded", function () {
     "On Annual Leave": "☀️ On Annual Leave",
     "Sick Leave": "🤒 Sick Leave"
   };
-
-  const employees = [
-    // Replace this list with real employee objects when deployed
-  ];
 
   const weekDropdown = document.getElementById("weekDropdown");
   const boardContainer = document.getElementById("adminBoardContainer");
@@ -62,6 +61,17 @@ document.addEventListener("DOMContentLoaded", function () {
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
     const weekNum = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
     return d.getUTCFullYear() + "-W" + String(weekNum).padStart(2, "0");
+  }
+
+  function getPrefilledState() {
+    return Array(5).fill().map(() => {
+      return {
+        "In Office": [...employeeNames],
+        "Working from Home": [],
+        "On Annual Leave": [],
+        "Sick Leave": []
+      };
+    });
   }
 
   function renderBoard() {
@@ -104,15 +114,18 @@ document.addEventListener("DOMContentLoaded", function () {
 
         const names = boardState?.[idx]?.[col] || [];
         names.forEach(name => {
-          const card = document.createElement("div");
-          card.className = "card";
-          card.draggable = true;
-          card.dataset.name = name;
-          card.textContent = name;
-          card.addEventListener("dragstart", e => {
-            e.dataTransfer.setData("text", name);
-          });
-          colDiv.appendChild(card);
+          const person = employees.find(p => p.Name === name);
+          if (person) {
+            const card = document.createElement("div");
+            card.className = "card";
+            card.draggable = true;
+            card.dataset.name = person.Name;
+            card.innerHTML = `<img src='${person["Photo URL"]}'><span>${person.Name}</span>`;
+            card.addEventListener("dragstart", e => {
+              e.dataTransfer.setData("text", person.Name);
+            });
+            colDiv.appendChild(card);
+          }
         });
 
         colDiv.addEventListener("dragover", e => e.preventDefault());
@@ -145,9 +158,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
     db.collection("boards").doc(key).get().then(doc => {
       const data = doc.exists ? doc.data() : {};
-      boardState = data.state || Array(5).fill().map(() =>
-        Object.fromEntries(columns.map(c => [c, []]))
-      );
+
+      if (!doc.exists) {
+        boardState = getPrefilledState();  // auto fill new week
+      } else {
+        boardState = data.state || getPrefilledState();  // fallback just in case
+      }
 
       bankHolidayChk.checked = !!data.bankHoliday;
       const mandays = data.mandatoryOfficeDays || [];
