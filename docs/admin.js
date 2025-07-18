@@ -1,5 +1,5 @@
 
-// ✅ Complete admin.js with working modal, toggle, drag-drop and Firebase — not a placeholder
+// Full admin.js with: prevent reset to Monday after drag, and reset week button
 document.addEventListener("DOMContentLoaded", function () {
   const firebaseConfig = {
     apiKey: "AIzaSyCxHyL3-ecLuVjGrM2HjEbfAV7Kgh-Ufs8",
@@ -9,10 +9,17 @@ document.addEventListener("DOMContentLoaded", function () {
     messagingSenderId: "204510362340",
     appId: "1:204510362340:web:77f93cb517cbbee2f70af1"
   };
+
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
 
-  const employeeNames = ["Jeni Jones", "Joe Bungey", "Phil Boshier", "Oscar Dixon-Barrow", "Jack Perks", "Elaine Connell", "Martha Cumiskey", "Matt Owen", "Charlotte Berrow", "Hannah Lawry", "Molly McGuire", "Ben McKenna-Smith", "Ben Hackston", "Summer Bolitho", "Jack Wheeler"];
+  const employeeNames = [
+    "Joe Bungey", "Jeni Jones", "Phil Boshier", "Daniela Kent", "Gregg Raven",
+    "Oscar Dixon-Barrow", "Jack Perks", "Elaine Connell", "Martha Cumiskey",
+    "Matt Owen", "Charlotte Berrow", "Hannah Lawry", "Molly McGuire",
+    "Ben McKenna-Smith", "Ben Hackston", "Summer Bolitho", "Jack Wheeler"
+  ];
+
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
   const columns = ["In Office", "Working from Home", "On Annual Leave", "Sick Leave"];
   const columnLabels = {
@@ -25,17 +32,24 @@ document.addEventListener("DOMContentLoaded", function () {
   const weekDropdown = document.getElementById("weekDropdown");
   const boardContainer = document.getElementById("adminBoardContainer");
   const releaseBtn = document.getElementById("releaseBtn");
+  const resetBtn = document.createElement("button");
+  resetBtn.textContent = "🔁 Reset Week";
+  releaseBtn.parentNode.insertBefore(resetBtn, releaseBtn.nextSibling);
   const statusMsg = document.getElementById("statusMessage");
   const bankHolidayChk = document.getElementById("bankHoliday");
 
   let selectedWeekKey = "";
   let boardState = [];
+  let activeTabIndex = 0;
 
-  const toggleDiv = document.createElement("div");
-  toggleDiv.innerHTML = '<label><input type="checkbox" id="halfDayToggle"> Enable Half Day Mode</label>';
-  document.body.insertBefore(toggleDiv, weekDropdown.parentNode);
-
-  const halfDayToggle = document.getElementById("halfDayToggle");
+  function getWeekKeyFromDate(dateObj) {
+    const d = new Date(Date.UTC(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const weekNum = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    return d.getUTCFullYear() + "-W" + String(weekNum).padStart(2, "0");
+  }
 
   const currentMonday = new Date();
   currentMonday.setDate(currentMonday.getDate() - (currentMonday.getDay() - 1));
@@ -50,15 +64,6 @@ document.addEventListener("DOMContentLoaded", function () {
     opt.value = key;
     opt.textContent = label;
     weekDropdown.appendChild(opt);
-  }
-
-  function getWeekKeyFromDate(dateObj) {
-    const d = new Date(Date.UTC(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()));
-    const dayNum = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    const weekNum = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-    return d.getUTCFullYear() + "-W" + String(weekNum).padStart(2, "0");
   }
 
   function getPrefilledState() {
@@ -85,6 +90,7 @@ document.addEventListener("DOMContentLoaded", function () {
       btn.className = "tab-button";
       btn.textContent = day;
       btn.addEventListener("click", () => {
+        activeTabIndex = idx;
         tabContent.querySelectorAll(".day-container").forEach(d => d.classList.remove("active"));
         tabs.querySelectorAll("button").forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
@@ -125,13 +131,7 @@ document.addEventListener("DOMContentLoaded", function () {
         colDiv.addEventListener("dragover", e => e.preventDefault());
         colDiv.addEventListener("drop", e => {
           const name = e.dataTransfer.getData("text");
-          if (halfDayToggle.checked && col !== "In Office") {
-            showHalfDayModal(name, (data) => {
-              moveCard(idx, col, data);
-            });
-          } else {
-            moveCard(idx, col, { name });
-          }
+          moveCard(idx, col, name);
         });
 
         columnsDiv.appendChild(colDiv);
@@ -141,52 +141,16 @@ document.addEventListener("DOMContentLoaded", function () {
       tabContent.appendChild(dayDiv);
     });
 
-    tabs.firstChild?.click();
+    tabs.children[activeTabIndex]?.click();
   }
 
-  function showHalfDayModal(name, callback) {
-    const modal = document.createElement("div");
-    modal.className = "modal";
-    modal.style.position = "fixed";
-    modal.style.top = "30%";
-    modal.style.left = "35%";
-    modal.style.background = "#fff";
-    modal.style.padding = "20px";
-    modal.style.border = "2px solid #000";
-    modal.style.zIndex = 1000;
-    modal.innerHTML = `
-      <p><strong>${name}</strong></p>
-      <label><input type="radio" name="half" value="AM" checked /> AM</label>
-      <label><input type="radio" name="half" value="PM" /> PM</label><br>
-      <label>Other half:</label>
-      <select id="otherHalf">
-        <option>In Office</option>
-        <option>Working from Home</option>
-        <option>On Annual Leave</option>
-        <option>Sick Leave</option>
-      </select><br><br>
-      <button id="confirmModal">Confirm</button>
-    `;
-    document.body.appendChild(modal);
-    document.getElementById("confirmModal").addEventListener("click", () => {
-      const half = modal.querySelector('input[name="half"]:checked').value;
-      const other = modal.querySelector("#otherHalf").value;
-      modal.remove();
-      callback({ name, halfDay: true, half, other });
-    });
-  }
-
-  function moveCard(day, col, data) {
+  function moveCard(day, col, name) {
     columns.forEach(c => {
-      boardState[day][c] = boardState[day][c].filter(e => {
-        const n = typeof e === "object" ? e.name : e;
-        return n !== data.name;
+      boardState[day][c] = boardState[day][c].filter(n => {
+        return (typeof n === "object" ? n.name : n) !== name;
       });
     });
-    boardState[day][col].push(data);
-    if (data.halfDay && data.other && data.other !== col) {
-      boardState[day][data.other].push(data.name + " (PM)");
-    }
+    boardState[day][col].push(name);
     renderBoard();
   }
 
@@ -210,6 +174,17 @@ document.addEventListener("DOMContentLoaded", function () {
       statusMsg.textContent = "✅ Board released to team.";
       setTimeout(() => statusMsg.textContent = "", 3000);
     });
+  });
+
+  resetBtn.addEventListener("click", () => {
+    if (confirm("This will permanently reset the board for this week. Are you sure?")) {
+      db.collection("boards").doc(selectedWeekKey).delete().then(() => {
+        statusMsg.textContent = "🔁 Week reset.";
+        boardState = getPrefilledState();
+        renderBoard();
+        setTimeout(() => statusMsg.textContent = "", 3000);
+      });
+    }
   });
 
   weekDropdown.addEventListener("change", loadWeekData);
