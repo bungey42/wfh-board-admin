@@ -139,10 +139,12 @@ document.addEventListener("DOMContentLoaded", function () {
           const halfDayEnabled = document.getElementById("halfDayToggle").checked;
 
           if (halfDayEnabled) {
-            const half = prompt("AM or PM?");
-            if (!half || !["AM", "PM"].includes(half)) return;
-            const other = prompt(`Where is ${name} for the other half day? (In Office, WFH, Annual Leave, Sick Leave)`);
-            if (!columns.includes(other)) return;
+  const half = window.prompt("Select half-day (type AM or PM):", "AM");
+  if (!half || !["AM", "PM"].includes(half.toUpperCase())) return;
+  const otherOptions = columns.filter(c => c !== col);
+  const other = window.prompt(`Where is ${name} for the other half day?\nOptions: ${otherOptions.join(", ")}`, otherOptions[0]);
+  if (!columns.includes(other)) return;
+
 
             columns.forEach(c => {
               boardState[idx][c] = boardState[idx][c].filter(n =>
