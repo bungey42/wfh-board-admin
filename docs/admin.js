@@ -1,5 +1,5 @@
 
-// Full admin.js with: prevent reset to Monday after drag, and reset week button
+// ✅ Full admin.js — merged version with drag/tab fix, reset week, and half-day support
 document.addEventListener("DOMContentLoaded", function () {
   const firebaseConfig = {
     apiKey: "AIzaSyCxHyL3-ecLuVjGrM2HjEbfAV7Kgh-Ufs8",
@@ -32,15 +32,18 @@ document.addEventListener("DOMContentLoaded", function () {
   const weekDropdown = document.getElementById("weekDropdown");
   const boardContainer = document.getElementById("adminBoardContainer");
   const releaseBtn = document.getElementById("releaseBtn");
+  const toggleHalfDay = document.getElementById("halfDayToggle");
+  const statusMsg = document.getElementById("statusMessage");
+  const bankHolidayChk = document.getElementById("bankHoliday");
+
   const resetBtn = document.createElement("button");
   resetBtn.textContent = "🔁 Reset Week";
   releaseBtn.parentNode.insertBefore(resetBtn, releaseBtn.nextSibling);
-  const statusMsg = document.getElementById("statusMessage");
-  const bankHolidayChk = document.getElementById("bankHoliday");
 
   let selectedWeekKey = "";
   let boardState = [];
   let activeTabIndex = 0;
+  let useHalfDay = false;
 
   function getWeekKeyFromDate(dateObj) {
     const d = new Date(Date.UTC(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate()));
@@ -69,7 +72,7 @@ document.addEventListener("DOMContentLoaded", function () {
   function getPrefilledState() {
     return Array(5).fill().map(() => {
       return {
-        "In Office": [...employeeNames],
+        "In Office": employeeNames.map(name => ({ name })),
         "Working from Home": [],
         "On Annual Leave": [],
         "Sick Leave": []
@@ -131,7 +134,11 @@ document.addEventListener("DOMContentLoaded", function () {
         colDiv.addEventListener("dragover", e => e.preventDefault());
         colDiv.addEventListener("drop", e => {
           const name = e.dataTransfer.getData("text");
-          moveCard(idx, col, name);
+          if (useHalfDay) {
+            showHalfDayModal(idx, col, name);
+          } else {
+            moveCard(idx, col, name);
+          }
         });
 
         columnsDiv.appendChild(colDiv);
@@ -144,13 +151,15 @@ document.addEventListener("DOMContentLoaded", function () {
     tabs.children[activeTabIndex]?.click();
   }
 
-  function moveCard(day, col, name) {
+  function moveCard(day, col, name, time = "full") {
     columns.forEach(c => {
       boardState[day][c] = boardState[day][c].filter(n => {
-        return (typeof n === "object" ? n.name : n) !== name;
+        const nName = typeof n === "object" ? n.name : n;
+        return nName !== name;
       });
     });
-    boardState[day][col].push(name);
+    const entry = time === "full" ? { name } : { name, time };
+    boardState[day][col].push(entry);
     renderBoard();
   }
 
@@ -186,6 +195,33 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     }
   });
+
+  if (toggleHalfDay) {
+    toggleHalfDay.addEventListener("change", () => {
+      useHalfDay = toggleHalfDay.checked;
+    });
+  }
+
+  function showHalfDayModal(day, col, name) {
+    const modal = document.createElement("div");
+    modal.className = "modal";
+    modal.innerHTML = \`
+      <div class="modal-content">
+        <p>Select time of day for \${name} in \${col}:</p>
+        <button data-time="AM">AM</button>
+        <button data-time="PM">PM</button>
+        <button data-time="full">Full Day</button>
+      </div>
+    \`;
+    document.body.appendChild(modal);
+    modal.querySelectorAll("button").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const time = btn.dataset.time;
+        moveCard(day, col, name, time);
+        document.body.removeChild(modal);
+      });
+    });
+  }
 
   weekDropdown.addEventListener("change", loadWeekData);
   weekDropdown.selectedIndex = 0;
