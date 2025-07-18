@@ -138,25 +138,63 @@ document.addEventListener("DOMContentLoaded", function () {
           const name = e.dataTransfer.getData("text");
           const halfDayEnabled = document.getElementById("halfDayToggle").checked;
 
-          if (halfDayEnabled) {
-  const half = window.prompt("Select half-day (type AM or PM):", "AM");
-  if (!half || !["AM", "PM"].includes(half.toUpperCase())) return;
-  const otherOptions = columns.filter(c => c !== col);
-  const other = window.prompt(`Where is ${name} for the other half day?\nOptions: ${otherOptions.join(", ")}`, otherOptions[0]);
-  if (!columns.includes(other)) return;
+if (halfDayEnabled) {
+  const modal = document.createElement("div");
+  modal.style.position = "fixed";
+  modal.style.top = "50%";
+  modal.style.left = "50%";
+  modal.style.transform = "translate(-50%, -50%)";
+  modal.style.background = "#fff";
+  modal.style.padding = "20px";
+  modal.style.border = "1px solid #ccc";
+  modal.style.boxShadow = "0 2px 10px rgba(0,0,0,0.2)";
+  modal.style.zIndex = 1000;
 
+  modal.innerHTML = `
+    <h3>Select half-day options for ${name}</h3>
+    <label>Which half is <strong>${col}</strong>?
+      <select id="halfSelect">
+        <option value="AM">AM</option>
+        <option value="PM">PM</option>
+      </select>
+    </label>
+    <br><br>
+    <label>Other half location:
+      <select id="otherSelect">
+        ${columns.filter(c => c !== col).map(c => `<option value="${c}">${columnLabels[c]}</option>`).join("")}
+      </select>
+    </label>
+    <br><br>
+    <button id="confirmHalf">Confirm</button>
+    <button id="cancelHalf">Cancel</button>
+  `;
 
-            columns.forEach(c => {
-              boardState[idx][c] = boardState[idx][c].filter(n =>
-                (typeof n === "object" ? n.name : n) !== name
-              );
-            });
+  document.body.appendChild(modal);
 
-            boardState[idx][col].push({ name, half });
-            boardState[idx][other].push({ name, half: half === "AM" ? "PM" : "AM" });
-          } else {
-            moveCard(idx, col, name);
-          }
+  document.getElementById("cancelHalf").onclick = () => {
+    document.body.removeChild(modal);
+  };
+
+  document.getElementById("confirmHalf").onclick = () => {
+    const half = document.getElementById("halfSelect").value;
+    const other = document.getElementById("otherSelect").value;
+
+    columns.forEach(c => {
+      boardState[idx][c] = boardState[idx][c].filter(n =>
+        (typeof n === "object" ? n.name : n) !== name
+      );
+    });
+
+    boardState[idx][col].push({ name, half });
+    boardState[idx][other].push({ name, half: half === "AM" ? "PM" : "AM" });
+
+    document.body.removeChild(modal);
+    renderBoard();
+  };
+
+  return;
+}
+
 
           renderBoard(); // keep current tab
         });
