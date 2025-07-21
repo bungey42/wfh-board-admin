@@ -195,7 +195,7 @@ if (halfDayEnabled) {
   return;
 }
 
-
+          moveCard(idx, col, name);
           renderBoard(); // keep current tab
         });
 
