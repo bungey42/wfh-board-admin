@@ -74,7 +74,7 @@ function loadEmployees() {
   function getPrefilledState() {
     return Array(5).fill().map(() => {
       return {
-        "In Office": employeeNames.map(name => name),
+        "In Office": employees.map(name => name),
         "Working from Home": [],
         "On Annual Leave": [],
         "Sick Leave": []
