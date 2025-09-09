@@ -71,16 +71,23 @@ function loadEmployees() {
     weekDropdown.appendChild(opt);
   }
 
-  function getPrefilledState() {
-    return Array(5).fill().map(() => {
-      return {
-        "In Office": employees.map(name => name),
-        "Working from Home": [],
-        "On Annual Leave": [],
-        "Sick Leave": []
-      };
+function getPrefilledState() {
+  return Array(5).fill().map(() => {
+    const dayState = {
+      "In Office": [],
+      "Working from Home": [],
+      "On Annual Leave": [],
+      "Sick Leave": []
+    };
+
+    employees.forEach(person => {
+      const defaultCol = columns.includes(person.defaultState) ? person.defaultState : "In Office";
+      dayState[defaultCol].push(person.name);
     });
-  }
+
+    return dayState;
+  });
+}
 
   function renderBoard() {
     boardContainer.innerHTML = "";
