@@ -12,10 +12,13 @@ document.addEventListener("DOMContentLoaded", function () {
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
 
-  const employeeNames = [ "Joe Bungey", "Jeni Jones", "Phil Boshier", "Daniela Kent", "Gregg Raven",
-    "Oscar Dixon-Barrow", "Jack Perks", "Elaine Connell", "Martha Cumiskey", "Matt Owen",
-    "Charlotte Berrow", "Hannah Lawry", "Molly McGuire", "Ben McKenna-Smith",
-    "Ben Hackston", "Summer Bolitho", "Jack Wheeler" ];
+  let employees = [];
+
+function loadEmployees() {
+  return db.collection("employees").where("active", "==", true).get().then(snapshot => {
+    employees = snapshot.docs.map(doc => doc.data());
+  });
+}
 
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
   const columns = ["In Office", "Working from Home", "On Annual Leave", "Sick Leave"];
@@ -219,16 +222,19 @@ if (halfDayEnabled) {
     boardState[day][col].push(name);
   }
 
-  function loadWeekData() {
-    const key = weekDropdown.value;
-    selectedWeekKey = key;
+function loadWeekData() {
+  const key = weekDropdown.value;
+  selectedWeekKey = key;
+
+  loadEmployees().then(() => {
     db.collection("boards").doc(key).get().then(doc => {
       const data = doc.exists ? doc.data() : {};
       boardState = data.state || getPrefilledState();
       bankHolidayChk.checked = !!data.bankHoliday;
       renderBoard();
     });
-  }
+  });
+}
 
   releaseBtn.addEventListener("click", () => {
     db.collection("boards").doc(selectedWeekKey).set({
